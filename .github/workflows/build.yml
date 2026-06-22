@@ -1,0 +1,25 @@
+name: Build RedlineOS
+on: workflow_dispatch
+
+jobs:
+  build:
+     runs-on: ubuntu-22.04
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v3
+
+       - name: initialize Source
+         run: |
+           mkdir ~/android
+           cd ~/android
+           repo init -u https://github.com/LineageOS/android.git -b lineage-18.1
+           git clone https://github.com/Blows12/android_device_xiaomi_kenzo -b R device/xiaomi/kenzo
+           git clone https://github.com/Bloes12/kernel_xiaomi_msm8956 -b bloss-shinelotus kernel/xiaomi/kenzo
+           repo sync -c --no-tags --optimized-fetch --prune --force-sync -j$(nproc --all)
+
+       - name: Build ROM
+         run: |
+           cd ~/android
+           source build/envsetup.sh
+           lunch redline_kenzo-userdebug
+           mka bacon
