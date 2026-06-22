@@ -1,25 +1,52 @@
 name: Build RedlineOS
-on: workflow_dispatch
+on:
+  workflow_dispatch:
 
 jobs:
   build:
-     runs-on: ubuntu-22.04
-     steps:
-       - name: Checkout
-         uses: actions/checkout@v3
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
 
-       - name: initialize Source
-         run: |
-           mkdir ~/android
-           cd ~/android
-           repo init -u https://github.com/LineageOS/android.git -b lineage-18.1
-           git clone https://github.com/Blows12/android_device_xiaomi_kenzo -b R device/xiaomi/kenzo
-           git clone https://github.com/Bloes12/kernel_xiaomi_msm8956 -b bloss-shinelotus kernel/xiaomi/kenzo
-           repo sync -c --no-tags --optimized-fetch --prune --force-sync -j$(nproc --all)
+      - name: Setup Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z-dev libgl1-mesa-dev libxml2-utils xsltproc unzip bc python3
+          mkdir -p ~/bin
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          echo "$HOME/bin" >> $GITHUB_PATH
 
-       - name: Build ROM
-         run: |
-           cd ~/android
-           source build/envsetup.sh
-           lunch redline_kenzo-userdebug
-           mka bacon
+      - name: Initialize Source
+        run: |
+          mkdir ~/android
+          cd ~/android
+          
+          # Konfigurasi git minimal agar repo init tidak error
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          
+          # Inisialisasi repositori utama
+          repo init -u https://github.com/LineageOS/android.git -b lineage-18.1 --depth=1
+          
+          # Membuat local manifest untuk mengunduh repositori custom Anda
+          mkdir -p .repo/local_manifests
+          cat <<EOF > .repo/local_manifests/roomservice.xml
+          <?xml version="1.0" encoding="UTF-8"?>
+          <manifest>
+            <project name="Blows12/android_device_xiaomi_kenzo" path="device/xiaomi/kenzo" remote="github" revision="R" />
+            <project name="Blows12/kernel_xiaomi_msm8956" path="kernel/xiaomi/kenzo" remote="github" revision="bloss-shinelotus" />
+            <project name="TheMuppets/proprietary_vendor_xiaomi" path="vendor/xiaomi" remote="github" revision="lineage-18.1" />
+          </manifest>
+          EOF
+          
+          # Sinkronisasi seluruh source code sekaligus
+          repo sync -c --no-tags --optimized-fetch --prune --force-sync -j$(nproc --all)
+
+      - name: Build ROM
+        run: |
+          cd ~/android
+          source build/envsetup.sh
+          lunch redline_kenzo-userdebug
+          mka bacon
